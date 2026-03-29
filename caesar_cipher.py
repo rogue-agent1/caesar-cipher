@@ -1,45 +1,46 @@
 #!/usr/bin/env python3
-"""caesar_cipher - Caesar cipher with brute force."""
-import sys, argparse, json, string
+"""Caesar and substitution ciphers. Zero dependencies."""
 
-def encrypt(text, shift):
+def caesar_encrypt(text, shift=3):
     result = []
-    for ch in text:
-        if ch.isalpha():
-            base = ord("A") if ch.isupper() else ord("a")
-            result.append(chr((ord(ch) - base + shift) % 26 + base))
-        else:
-            result.append(ch)
+    for c in text:
+        if c.isalpha():
+            base = ord('A') if c.isupper() else ord('a')
+            result.append(chr((ord(c)-base+shift)%26+base))
+        else: result.append(c)
     return "".join(result)
 
-def decrypt(text, shift):
-    return encrypt(text, -shift)
+def caesar_decrypt(text, shift=3):
+    return caesar_encrypt(text, -shift)
 
-def brute_force(text):
-    return [{"shift": i, "text": decrypt(text, i)} for i in range(26)]
+def caesar_crack(ciphertext):
+    freq = "ETAOINSHRDLCUMWFGYPBVKJXQZ"
+    best_shift = 0; best_score = -1
+    for shift in range(26):
+        plain = caesar_decrypt(ciphertext, shift)
+        score = sum(1 for c in plain.upper() if c in freq[:6])
+        if score > best_score: best_score = score; best_shift = shift
+    return best_shift, caesar_decrypt(ciphertext, best_shift)
 
-def frequency_attack(text):
-    freq = {}
-    for ch in text.lower():
-        if ch.isalpha(): freq[ch] = freq.get(ch, 0) + 1
-    if not freq: return 0
-    most_common = max(freq, key=freq.get)
-    return (ord(most_common) - ord("e")) % 26
+def vigenere_encrypt(text, key):
+    result = []; ki = 0
+    for c in text:
+        if c.isalpha():
+            base = ord('A') if c.isupper() else ord('a')
+            shift = ord(key[ki % len(key)].upper()) - ord('A')
+            result.append(chr((ord(c)-base+shift)%26+base))
+            ki += 1
+        else: result.append(c)
+    return "".join(result)
 
-def main():
-    p = argparse.ArgumentParser(description="Caesar cipher")
-    sub = p.add_subparsers(dest="cmd")
-    e = sub.add_parser("encrypt"); e.add_argument("text"); e.add_argument("shift", type=int)
-    d = sub.add_parser("decrypt"); d.add_argument("text"); d.add_argument("shift", type=int)
-    b = sub.add_parser("crack"); b.add_argument("text")
-    args = p.parse_args()
-    if args.cmd == "encrypt":
-        print(json.dumps({"plaintext": args.text, "shift": args.shift, "ciphertext": encrypt(args.text, args.shift)}))
-    elif args.cmd == "decrypt":
-        print(json.dumps({"ciphertext": args.text, "shift": args.shift, "plaintext": decrypt(args.text, args.shift)}))
-    elif args.cmd == "crack":
-        likely = frequency_attack(args.text)
-        print(json.dumps({"ciphertext": args.text, "likely_shift": likely, "likely_plaintext": decrypt(args.text, likely), "all_shifts": brute_force(args.text)}, indent=2))
-    else: p.print_help()
+def vigenere_decrypt(text, key):
+    inv_key = "".join(chr((26-(ord(c.upper())-ord('A')))%26+ord('A')) for c in key)
+    return vigenere_encrypt(text, inv_key)
 
-if __name__ == "__main__": main()
+def rot13(text): return caesar_encrypt(text, 13)
+
+if __name__ == "__main__":
+    import sys
+    text = " ".join(sys.argv[1:]) or "Hello World"
+    print(f"Caesar: {caesar_encrypt(text)}")
+    print(f"ROT13: {rot13(text)}")
