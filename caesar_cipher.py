@@ -1,26 +1,45 @@
 #!/usr/bin/env python3
-"""Caesar cipher encoder/decoder with brute force."""
-import sys
+"""caesar_cipher - Caesar cipher with brute force."""
+import sys, argparse, json, string
 
-def shift(text, n):
-    out = []
-    for c in text:
-        if c.isalpha():
-            base = ord('A') if c.isupper() else ord('a')
-            out.append(chr((ord(c) - base + n) % 26 + base))
+def encrypt(text, shift):
+    result = []
+    for ch in text:
+        if ch.isalpha():
+            base = ord("A") if ch.isupper() else ord("a")
+            result.append(chr((ord(ch) - base + shift) % 26 + base))
         else:
-            out.append(c)
-    return ''.join(out)
+            result.append(ch)
+    return "".join(result)
 
-def brute(text):
-    for i in range(26):
-        print(f"ROT-{i:2d}: {shift(text, i)}")
+def decrypt(text, shift):
+    return encrypt(text, -shift)
 
-if __name__ == '__main__':
-    if len(sys.argv) < 3: print("Usage: caesar_cipher.py <encode|decode|brute> <text> [shift]"); sys.exit(1)
-    cmd, text = sys.argv[1], ' '.join(sys.argv[2:] if cmd == 'brute' else sys.argv[2:-1] if len(sys.argv) > 3 else sys.argv[2:])
-    if cmd == 'brute': brute(text)
-    else:
-        n = int(sys.argv[-1]) if len(sys.argv) > 3 else 13
-        if cmd == 'decode': n = -n
-        print(shift(text, n))
+def brute_force(text):
+    return [{"shift": i, "text": decrypt(text, i)} for i in range(26)]
+
+def frequency_attack(text):
+    freq = {}
+    for ch in text.lower():
+        if ch.isalpha(): freq[ch] = freq.get(ch, 0) + 1
+    if not freq: return 0
+    most_common = max(freq, key=freq.get)
+    return (ord(most_common) - ord("e")) % 26
+
+def main():
+    p = argparse.ArgumentParser(description="Caesar cipher")
+    sub = p.add_subparsers(dest="cmd")
+    e = sub.add_parser("encrypt"); e.add_argument("text"); e.add_argument("shift", type=int)
+    d = sub.add_parser("decrypt"); d.add_argument("text"); d.add_argument("shift", type=int)
+    b = sub.add_parser("crack"); b.add_argument("text")
+    args = p.parse_args()
+    if args.cmd == "encrypt":
+        print(json.dumps({"plaintext": args.text, "shift": args.shift, "ciphertext": encrypt(args.text, args.shift)}))
+    elif args.cmd == "decrypt":
+        print(json.dumps({"ciphertext": args.text, "shift": args.shift, "plaintext": decrypt(args.text, args.shift)}))
+    elif args.cmd == "crack":
+        likely = frequency_attack(args.text)
+        print(json.dumps({"ciphertext": args.text, "likely_shift": likely, "likely_plaintext": decrypt(args.text, likely), "all_shifts": brute_force(args.text)}, indent=2))
+    else: p.print_help()
+
+if __name__ == "__main__": main()
